@@ -2,17 +2,20 @@ package main
 
 import (
 	"context"
-	"firebase.google.com/go"
 	"fmt"
+	"github.com/ToluwaniO/utube/controller"
+	"github.com/ToluwaniO/utube/global"
+	"github.com/ToluwaniO/utube/helper"
 	"log"
 	"net/http"
 	"os"
-	"google.golang.org/api/option"
 )
 
 func main() {
-	initFirebase()
+	//firebaseClient := initFirebase()
+	initGlobal()
 	http.HandleFunc("/", indexHandler)
+	http.Handle("/addUser", isAuthorized(controller.AddUser))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -24,12 +27,22 @@ func main() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 }
 
-func initFirebase() {
-	opt := option.WithCredentialsFile("env/serviceAccountKey.json")
-	_, err := firebase.NewApp(context.Background(), nil, opt)
-	if err != nil {
-		log.Fatalf("error initializing app: %v\n", err)
-	}
+func isAuthorized(endpoint func(http.ResponseWriter, *http.Request)) http.Handler  {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorization := r.Header.Get("Authorization")
+		_, err := helper.ValidateToken(context.Background(), authorization)
+
+		if err != nil {
+			fmt.Println(err)
+			fmt.Fprintf(w, "Unauthorized")
+			return
+		}
+		endpoint(w, r)
+	})
+}
+
+func initGlobal() {
+	global.InitVariables()
 }
 
 // indexHandler responds to requests with our greeting.
